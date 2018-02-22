@@ -3,6 +3,7 @@ debug = true
 
 [workspace]
 members = [
+  "components/bitbucket-api-client",
   "components/builder-api-client",
   "components/builder-depot-client",
   "components/butterfly",

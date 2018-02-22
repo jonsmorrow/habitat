@@ -59,6 +59,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitbucket-api-client"
+version = "0.0.0"
+dependencies = [
+ "habitat_http_client 0.0.0",
+]
+
+[[package]]
 name = "bitflags"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
