@@ -13,6 +13,7 @@
 // limitations under the License.
 
 extern crate habitat_http_client as hab_http;
+extern crate hyper;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

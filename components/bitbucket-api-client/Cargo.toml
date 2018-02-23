@@ -6,6 +6,7 @@ description = "Bitbucket HTTP API Client"
 workspace = "../../"
 
 [dependencies]
+hyper = "0.10"
 serde = "*"
 serde_derive = "*"
 serde_json = "*"
