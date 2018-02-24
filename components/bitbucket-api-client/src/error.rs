@@ -14,9 +14,11 @@
 
 use std::error;
 use std::fmt;
+use std::io;
 
 use hyper;
 use hab_http;
+use serde_json;
 
 use types;
 
@@ -28,15 +30,19 @@ pub enum BitbucketError {
     Auth(types::AuthErr),
     HttpClient(hyper::Error),
     HttpResponse(hyper::status::StatusCode),
+    IO(io::Error),
+    Serialization(serde_json::Error),
 }
 
 impl fmt::Display for BitbucketError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let msg = match *self {
             BitbucketError::ApiClient(ref e) => format!("{}", e),
-            HubError::Auth(ref e) => format!("Bitbucket Authentication error, {}", e),
+            BitbucketError::Auth(ref e) => format!("Bitbucket Authentication error, {}", e),
             BitbucketError::HttpClient(ref e) => format!("{}", e),
             BitbucketError::HttpResponse(ref e) => format!("{}", e),
+            BitbucketError::IO(ref e) => format!("{}", e),
+            BitbucketError::Serialization(ref e) => format!("{}", e),
         };
         write!(f, "{}", msg)
     }
@@ -46,9 +52,35 @@ impl error::Error for BitbucketError {
     fn description(&self) -> &str {
         match *self {
             BitbucketError::ApiClient(ref err) => err.description(),
-            HubError::Auth(_) => "Bitbucket authorization error.",
+            BitbucketError::Auth(_) => "Bitbucket authorization error.",
             BitbucketError::HttpClient(ref err) => err.description(),
             BitbucketError::HttpResponse(_) => "Non-200 HTTP response.",
+            BitbucketError::IO(ref err) => err.description(),
+            BitbucketError::Serialization(ref err) => err.description(),
         }
+    }
+}
+
+impl From<types::AuthErr> for BitbucketError {
+    fn from(err: types::AuthErr) -> Self {
+        BitbucketError::Auth(err)
+    }
+}
+
+impl From<hyper::Error> for BitbucketError {
+    fn from(err: hyper::Error) -> Self {
+        BitbucketError::HttpClient(err)
+    }
+}
+
+impl From<io::Error> for BitbucketError {
+    fn from(err: io::Error) -> Self {
+        BitbucketError::IO(err)
+    }
+}
+
+impl From<serde_json::Error> for BitbucketError {
+    fn from(err: serde_json::Error) -> Self {
+        BitbucketError::Serialization(err)
     }
 }

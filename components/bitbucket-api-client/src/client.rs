@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io::Read;
+
 use hab_http::ApiClient;
 use hyper::client::{RequestBuilder, Response};
-use hyper::header::{Authorization, Bearer};
+use hyper::header::{Authorization, Basic, Bearer};
 use serde_json;
 
 use config::BitbucketCfg;
@@ -39,7 +41,14 @@ impl BitbucketClient {
     // This function takes the code received from the Oauth dance and exchanges
     // it for an access token
     pub fn authenticate(&self, code: &str) -> BitbucketResult<String> {
-        let mut resp = http_post("authenticate", None::<String>)?;
+        let query = format!("grant_type=authorization_code&code={}", code);
+        let mut resp = self.http_post(
+            "site/oauth2/access_token",
+            Some(&query),
+            None::<String>,
+            Some(self.client_id),
+            Some(self.client_secret),
+        )?;
         if resp.status.is_success() {
             let mut body = String::new();
             resp.read_to_string(&mut body)?;
@@ -72,21 +81,37 @@ impl BitbucketClient {
         path: &str,
         query_string: Option<&str>,
         token: Option<T>,
+        username: Option<T>,
+        password: Option<T>,
     ) -> BitbucketResult<Response>
     where
         T: ToString,
     {
         let client = ApiClient::new(&self.url, "habitat", "0.54.0", None)
             .map_err(BitbucketError::ApiClient)?;
-        let mut req;
-
-        if let Some(qs) = query_string {
-            req = client.post(path);
-        } else {
-            req = client.post(path);
-        }
+        let mut req = client.post_with_custom_url(path, |url| if query_string.is_some() {
+            url.set_query(query_string)
+        });
         req = self.maybe_add_token(req, token);
+        req = self.maybe_add_basic(req, username, password);
         req.send().map_err(BitbucketError::HttpClient)
+    }
+
+    fn maybe_add_basic<'a, T>(
+        &'a self,
+        req: RequestBuilder<'a>,
+        username: Option<T>,
+        password: Option<T>,
+    ) -> RequestBuilder
+    where
+        T: ToString,
+    {
+        if username.is_some() {
+            req.header(Authorization(Basic {
+                username: username.unwrap().to_string(),
+                password: password.and_then(String::from),
+            }))
+        }
     }
 
     fn maybe_add_token<'a, T>(&'a self, req: RequestBuilder<'a>, token: Option<T>) -> RequestBuilder
