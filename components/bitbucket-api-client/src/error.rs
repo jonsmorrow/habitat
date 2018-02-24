@@ -18,19 +18,25 @@ use std::fmt;
 use hyper;
 use hab_http;
 
+use types;
+
 pub type BitbucketResult<T> = Result<T, BitbucketError>;
 
 #[derive(Debug)]
 pub enum BitbucketError {
     ApiClient(hab_http::Error),
+    Auth(types::AuthErr),
     HttpClient(hyper::Error),
+    HttpResponse(hyper::status::StatusCode),
 }
 
 impl fmt::Display for BitbucketError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let msg = match *self {
             BitbucketError::ApiClient(ref e) => format!("{}", e),
+            HubError::Auth(ref e) => format!("Bitbucket Authentication error, {}", e),
             BitbucketError::HttpClient(ref e) => format!("{}", e),
+            BitbucketError::HttpResponse(ref e) => format!("{}", e),
         };
         write!(f, "{}", msg)
     }
@@ -40,7 +46,9 @@ impl error::Error for BitbucketError {
     fn description(&self) -> &str {
         match *self {
             BitbucketError::ApiClient(ref err) => err.description(),
+            HubError::Auth(_) => "Bitbucket authorization error.",
             BitbucketError::HttpClient(ref err) => err.description(),
+            BitbucketError::HttpResponse(_) => "Non-200 HTTP response.",
         }
     }
 }

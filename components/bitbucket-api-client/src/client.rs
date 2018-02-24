@@ -15,9 +15,11 @@
 use hab_http::ApiClient;
 use hyper::client::{RequestBuilder, Response};
 use hyper::header::{Authorization, Bearer};
+use serde_json;
 
 use config::BitbucketCfg;
 use error::{BitbucketError, BitbucketResult};
+use types::*;
 
 pub struct BitbucketClient {
     pub url: String,
@@ -34,7 +36,25 @@ impl BitbucketClient {
         }
     }
 
-    pub fn authenticate(&self, code: &str) -> BitbucketResult<String> {}
+    // This function takes the code received from the Oauth dance and exchanges
+    // it for an access token
+    pub fn authenticate(&self, code: &str) -> BitbucketResult<String> {
+        let mut resp = http_post("authenticate", None::<String>)?;
+        if resp.status.is_success() {
+            let mut body = String::new();
+            resp.read_to_string(&mut body)?;
+            debug!("Bitbucket response body, {}", body);
+            match serde_json::from_str::<AuthOk>(&body) {
+                Ok(msg) => Ok(msg.access_token),
+                Err(_) => {
+                    let err = serde_json::from_str::<AuthErr>(&body)?;
+                    Err(BitbucketError::Auth(err))
+                }
+            }
+        } else {
+            Err(BitbucketError::HttpResponse(resp.status))
+        }
+    }
 
     fn http_get<T>(&self, path: &str, token: Option<T>) -> BitbucketResult<Response>
     where
@@ -47,13 +67,24 @@ impl BitbucketClient {
         req.send().map_err(BitbucketError::HttpClient)
     }
 
-    fn http_post<T>(&self, path: &str, token: Option<T>) -> BitbucketResult<Response>
+    fn http_post<T>(
+        &self,
+        path: &str,
+        query_string: Option<&str>,
+        token: Option<T>,
+    ) -> BitbucketResult<Response>
     where
         T: ToString,
     {
         let client = ApiClient::new(&self.url, "habitat", "0.54.0", None)
             .map_err(BitbucketError::ApiClient)?;
-        let mut req = client.post(path);
+        let mut req;
+
+        if let Some(qs) = query_string {
+            req = client.post(path);
+        } else {
+            req = client.post(path);
+        }
         req = self.maybe_add_token(req, token);
         req.send().map_err(BitbucketError::HttpClient)
     }
