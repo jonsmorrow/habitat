@@ -36,15 +36,21 @@ do_install() {
     install -v -D "$f" "$pkg_prefix"/libexec/"$f"
   done
 
-  lbb="$pkg_prefix/libexec/busybox"
+  # Busybox allows us to link each command busybox includes to the statically
+  # built busybox binary and it will behave as if the command was called. By
+  # installing copies of all busybox commands under `libexec/bin` we will have
+  # access to them while we build up the studio in the studio scripts instead
+  # of prefixing commands with $bb.
+  lbb="$pkg_prefix/libexec/bin/busybox"
+  install -v -D $(pkg_path_for busybox-static)/bin/busybox $lbb
+  for i in $($pkg_prefix/libexec/bin/busybox --list); do
+    ln -sv busybox $pkg_prefix/libexec/bin/$i
+  done
 
-  # Install a copy of a statically built busybox under `libexec/`
-  install -v -D "$(pkg_path_for busybox-static)"/bin/busybox "$lbb"
-
-  hab_dir=$(tr '/' '-' < "$(pkg_path_for hab)"/IDENT)
-  install -v -D "$(pkg_path_for hab)"/bin/hab \
-    "$pkg_prefix"/libexec/"$hab_dir"/bin/hab
-  ln -sv "$hab_dir"/bin/hab "$pkg_prefix"/libexec/hab
+  hab_dir=$(cat $(pkg_path_for hab)/IDENT | tr '/' '-')
+  install -v -D $(pkg_path_for hab)/bin/hab \
+    $pkg_prefix/libexec/$hab_dir/bin/hab
+  ln -sv ../$hab_dir/bin/hab $pkg_prefix/libexec/bin/hab
 }
 
 # Turn the remaining default phases into no-ops
