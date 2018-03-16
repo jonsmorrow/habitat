@@ -57,21 +57,27 @@ finish_setup() {
 
   tar_file="$TAR_DIR/$(basename $STAGE1_TOOLS_URL)"
 
-  if [ ! -f $tar_file ]; then
-    trap 'rm -f $tar_file; exit $?' INT TERM EXIT
-    info "Downloading $STAGE1_TOOLS_URL"
-    wget $STAGE1_TOOLS_URL -O $tar_file
-    trap - INT TERM EXIT
-  fi
+  # if [ ! -f $tar_file ]; then
+  #   trap 'rm -f $tar_file; exit $?' INT TERM EXIT
+  #   info "Downloading $STAGE1_TOOLS_URL"
+  #   wget $STAGE1_TOOLS_URL -O $tar_file
+  #   trap - INT TERM EXIT
+  # fi
 
   info "Extracting $(basename $tar_file)"
-  xzcat $tar_file | tar xf - -C $HAB_STUDIO_ROOT
+  # xzcat $tar_file | tar xf - -C $HAB_STUDIO_ROOT
+
+  #TODO: Put these in tools tar...
+  mkdir -p $HAB_STUDIO_ROOT/tools/bin
+  mkdir -p $HAB_STUDIO_ROOT/tools/usr/bin
+  cp $(which bash) $HAB_STUDIO_ROOT/tools/bin
+  cp $(which env) $HAB_STUDIO_ROOT/tools/usr/bin
 
   # Create symlinks from the minimal toolchain installed under `/tools` into
   # the root of the chroot environment. This is done to satisfy tools such as
   # `make(1)` which expect `/bin/sh` to exist.
 
-  ln -sf $v /tools/bin/bash $HAB_STUDIO_ROOT/bin
+  ln -sf $v /tools/bin/bash $HAB_STUDIO_ROOT/bin/bash
 }
 
 _hab() {

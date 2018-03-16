@@ -31,10 +31,53 @@ new_studio() {
   fi
 
   # Create root filesystem
+{
+cat <<EOF
+/bin
+/dev
+/usr
+/usr/lib
+/usr/lib/closure
+/usr/lib/system
+EOF
+} | while read dir; do
+  mkdir -p $v $HAB_STUDIO_ROOT$dir
+done
 
-  mkdir -p $v $HAB_STUDIO_ROOT/bin
-  mkdir -p $v $HAB_STUDIO_ROOT/usr
-  mkdir -p $v $HAB_STUDIO_ROOT/dev
+
+  # Create required devices
+  for file in /dev/null /dev/urandom /dev/zero; do
+    if [ ! -c $HAB_STUDIO_ROOT$file ]; then
+      majmin="$(ls -l "$file" | awk '{print $5, $6}' | tr -d ,)"
+      mknod $HAB_STUDIO_ROOT$file c $majmin
+    fi
+  done
+
+  # Copy in minimum mac base libraries. Macs do not allow full static linking
+  # so we must bring in libSystem.dylib -> libsystem.B.dylib and it's deps as
+  # everything will at least link to this. We use otool to get all the dependent
+  # libraries.
+  ln -sf $v $HAB_STUDIO_ROOT/usr/lib/libSystem.B.dylib $HAB_STUDIO_ROOT/usr/lib/libSystem.dylib
+  local to_check="/usr/lib/dyld /usr/lib/libSystem.B.dylib"
+  local to_check="$to_check /usr/lib/libncurses.5.4.dylib /usr/lib/libiconv.2.dylib" # to make bash work...
+  local visited=""
+  while true; do
+    local count="$([ -z "$to_check" ] && echo 0 || echo $(echo $to_check | tr ' ' '\n' | wc -l))"
+    [ $count -eq 0 ] && break
+    for file in $to_check; do
+      deps="$(otool -L $file | sed 1d | awk '{print $1}')"
+      local rx="$(echo $visited | tr ' ' '\n' | sed -e 's/^/^/;s/$/$/;s/+/\\+/g' | tr '\n' '|' | sed -e 's/|$//')"
+      ! deps_not_checked="$(echo $deps | tr ' ' '\n' | grep -Ev $rx)"
+      to_check="$to_check $deps_not_checked"
+      visited="$visited $file"
+      rx="$(echo $file | tr ' ' '\n' | sed -e 's/^/^/;s/$/$/;s/+/\\+/g' |  tr '\n' '|' | sed -e 's/|$//')"
+      ! to_check="$(echo $to_check | tr ' ' '\n' | grep -Ev $rx)"
+    done
+  done
+
+  for file in $visited; do
+    cp -a $file $HAB_STUDIO_ROOT$file
+  done
 
   # Load the appropriate type strategy to complete the setup
   . $libexec_path/hab-studio-mac-type-${STUDIO_TYPE}.sh
@@ -53,7 +96,6 @@ studio_build_environment="$studio_build_environment"
 studio_build_command="$studio_build_command"
 studio_run_environment="$studio_run_environment"
 EOF
-
   # exit_with "Mac not implemented yet" 100
 }
 
@@ -102,18 +144,30 @@ set_path_for_platform() {
   # Put additional commands in path.
   # TODO: These should be provided internally to the package.
   ln -fsv $(which awk) $libexec_path/sys_bin/awk
-  ln -fsv $(which basename) $libexec_path/sys_bin/basename
-  ln -fsv $(which cat) $libexec_path/sys_bin/cat
-  ln -fsv $(which chroot) $libexec_path/sys_bin/chroot
-  ln -fsv $(which env) $libexec_path/sys_bin/env
-  ln -fsv $(which id) $libexec_path/sys_bin/id
-  ln -fsv $(which ln) $libexec_path/sys_bin/ln
-  ln -fsv $(which mkdir) $libexec_path/sys_bin/mkdir
-  ln -fsv $(which readlink) $libexec_path/sys_bin/readlink
-  ln -fsv $(which rm) $libexec_path/sys_bin/rm
+  ln -fsv $(which basename) $libexec_path/sys_bin/basename #
+  ln -fsv $(which bash) $libexec_path/sys_bin/bash
+  ln -fsv $(which cat) $libexec_path/sys_bin/cat #
+  ln -fsv $(which cut) $libexec_path/sys_bin/cut #
+  ln -fsv $(which cp) $libexec_path/sys_bin/cp #
+  ln -fsv $(which chroot) $libexec_path/sys_bin/chroot #
+  ln -fsv $(which chown) $libexec_path/sys_bin/chown #
+  ln -fsv $(which env) $libexec_path/sys_bin/env #
+  ln -fsv $(which grep) $libexec_path/sys_bin/grep
+  ln -fsv $(which id) $libexec_path/sys_bin/id #
+  ln -fsv $(which ln) $libexec_path/sys_bin/ln #
+  ln -fsv $(which ls) $libexec_path/sys_bin/ls #
+  ln -fsv $(which mkdir) $libexec_path/sys_bin/mkdir #
+  ln -fsv $(which mknod) $libexec_path/sys_bin/mknod #
+  ln -fsv $(which otool) $libexec_path/sys_bin/otool
+  ln -fsv $(which readlink) $libexec_path/sys_bin/readlink #
+  ln -fsv $(which rm) $libexec_path/sys_bin/rm #
   ln -fsv $(which sed) $libexec_path/sys_bin/sed
+  ln -fsv $(which stat) $libexec_path/sys_bin/stat #
   ln -fsv $(which tar) $libexec_path/sys_bin/tar
+  ln -fsv $(which tr) $libexec_path/sys_bin/tr #
+  ln -fsv $(which wc) $libexec_path/sys_bin/wc #
   ln -fsv $(which wget) $libexec_path/sys_bin/wget
+  ln -fsv $(which which) $libexec_path/sys_bin/which
   ln -fsv $(which xzcat) $libexec_path/sys_bin/xzcat
   path_for_platform=$libexec_path/sys_bin
 }
